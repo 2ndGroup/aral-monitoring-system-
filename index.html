@@ -83,7 +83,6 @@ th{background:#f8fafc;text-align:left}
    <input id="nit" type="number" placeholder="Total Items" value="20">
    <input id="npr" type="number" placeholder="Pre-Test Score">
    <input id="npo" type="number" placeholder="Post-Test Score">
-   <input id="npass" type="password" placeholder="Student &amp; Parent Password (unique)">
    <button onclick="add()" style="background:#15803d;height:33px">+ Add LRN</button>
   </div>
 </div>
@@ -91,7 +90,7 @@ th{background:#f8fafc;text-align:left}
 <div style="overflow-x:auto">
   <table>
    <thead>
-    <tr><th>LRN</th><th>Learner &amp; Logins</th><th>Shared Student/Parent Password</th><th>Subject &amp; Items</th><th>Pre-Test</th><th>Post-Test</th><th>Auto Gain</th><th>Attendance (- / +)</th><th>Notes</th><th>Status</th><th class="no-print">Del</th></tr>
+    <tr><th>LRN</th><th>Learner &amp; Logins (Passwords Hidden)</th><th>Subject &amp; Items</th><th>Pre-Test</th><th>Post-Test</th><th>Auto Gain</th><th>Attendance (- / +)</th><th>Notes</th><th>Status</th><th class="no-print">Del</th></tr>
    </thead>
    <tbody id="tb"></tbody>
   </table>
@@ -110,12 +109,13 @@ th{background:#f8fafc;text-align:left}
 <div id="vP" class="box" style="display:none;max-width:650px;margin:16px auto">
 <h3 id="pt" style="margin:0 0 10px 0"></h3>
 <div class="prof no-print">
-  <b style="font-size:12px;display:block;margin-bottom:6px;color:#1d4ed8">My Profile Settings</b>
+  <b style="font-size:12px;display:block;margin-bottom:6px;color:#1d4ed8">My Profile Settings (Update Your Name &amp; Private Password)</b>
   <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:6px">
    <input id="ppName" placeholder="Your Full Name">
-   <button onclick="savePProf()" style="background:#15803d;height:33px">Save Name</button>
+   <input id="ppPass" type="password" placeholder="Enter New Private Password">
+   <button onclick="savePProf()" style="background:#15803d;height:33px">Save Name &amp; Password</button>
   </div>
-  <small style="color:#475569;display:block;margin-top:4px">You can update your name only. Password changes are managed by the teacher.</small>
+  <small id="pwStatus" style="color:#475569;display:block;margin-top:4px"></small>
 </div>
 <div id="pb"></div>
 <button onclick="window.print()" style="margin-top:12px">Print Progress Card</button>
@@ -176,24 +176,20 @@ function savePProf(){
 if(!cur||cur.r==="t")return;
 var x=db[cur.idx];
 var nm=document.getElementById("ppName").value.trim();
-if(!nm){alert("Please enter your name.");return;}
+var pw=document.getElementById("ppPass").value.trim();
+if(!nm&&!pw){alert("Please enter a new name or a new password to update.");return;}
+if(pw&&pw.length<4){alert("New password must be at least 4 characters.");return;}
 if(cur.r==="s"){
-  x.name=nm;
+  if(nm)x.name=nm;
+  if(pw){x.spw=pw;x.spwChanged=true;}
 }else if(cur.r==="p"){
-  x.pname=nm;
+  if(nm)x.pname=nm;
+  if(pw){x.ppw=pw;x.ppwChanged=true;}
 }
 saveDb();
+document.getElementById("ppPass").value="";
 drawP();
-alert("Your name has been updated. Your password has not been changed.");
-}
-function setSharedPass(i,v){
-if(!isT())return;
-var pw=String(v||"").trim();
-if(!pw){alert("Password cannot be empty.");draw();return;}
-db[i].spw=pw;
-db[i].ppw=pw;
-saveDb();
-alert("Student and parent passwords are now the same.");
+alert("Saved! Your name and private password have been updated.");
 }
 function upd(i,k,v){
 if(!isT())return;
@@ -220,12 +216,11 @@ var post=Math.min(it,Math.max(0,Number(document.getElementById("npo").value)||0)
 if(!c){alert("Please enter the learner's LRN.");return;}
 for(var i=0;i<db.length;i++){if(String(db[i].lrn).toLowerCase()===c.toLowerCase()){alert("This LRN is already enrolled.");return;}}
 var pu="parent_"+c.toLowerCase();
-var sharedPw=document.getElementById("npass").value.trim()||c;
-db.push({id:Date.now(),lrn:c,name:n,pname:"Parent/Guardian",sec:document.getElementById("ns").value.trim()||"Grade 7",sub:sub,items:it,preRaw:pre,postRaw:post,att:0,miss:0,note:"Enrolled in "+sub,su:c,pu:pu,spw:sharedPw,ppw:sharedPw,spwChanged:false,ppwChanged:false});
+db.push({id:Date.now(),lrn:c,name:n,pname:"Parent/Guardian",sec:document.getElementById("ns").value.trim()||"Grade 7",sub:sub,items:it,preRaw:pre,postRaw:post,att:0,miss:0,note:"Enrolled in "+sub,su:c,pu:pu,spw:c,ppw:c,spwChanged:false,ppwChanged:false});
 saveDb();
-["nl","nn","ns","npr","npo","npass"].forEach(function(id){document.getElementById(id).value="";});
+["nl","nn","ns","npr","npo"].forEach(function(id){document.getElementById(id).value="";});
 document.getElementById("nit").value="20";draw();
-alert("LRN "+c+" added to "+sub+"!\n\nStudent Login: "+c+"\nParent Login: "+pu+"\nShared Password: "+sharedPw);
+alert("LRN "+c+" added to "+sub+"!\n\nStudent Login: "+c+" (Initial Pass: "+c+")\nParent Login: "+pu+" (Initial Pass: "+c+")");
 }
 function show(){
 document.getElementById("vL").style.display=cur?"none":"block";
@@ -245,8 +240,7 @@ for(var i=0;i<db.length;i++){
   if(rk)fl++;sp+=p1;so+=p2;
   var opts=["Reading","Mathematics","Science"].map(function(s){return "<option value='"+s+"'"+(x.sub===s?" selected":"")+">"+s+"</option>";}).join("");
   h+="<tr><td><input class='e' style='width:95px' value='"+x.lrn+"' onchange='upd("+i+",\"lrn\",this.value)'></td>"+
-  "<td><input class='e' style='font-weight:bold;width:125px' value='"+x.name+"' onchange='upd("+i+",\"name\",this.value)'><br><input class='e' style='width:105px;font-size:11px' value='"+x.sec+"' onchange='upd("+i+",\"sec\",this.value)'><br><small style='color:#64748b'>Stu ID: "+x.su+" | Par ID: "+x.pu+"</small></td>"+
-  "<td><input type='password' class='e' style='width:115px' value='"+(x.spw!==undefined?x.spw:x.lrn)+"' onchange='setSharedPass("+i+",this.value)' title='Teacher can set one password for both accounts'><br><small>Same for student &amp; parent</small></td>"+
+  "<td><input class='e' style='font-weight:bold;width:125px' value='"+x.name+"' onchange='upd("+i+",\"name\",this.value)'><br><input class='e' style='width:105px;font-size:11px' value='"+x.sec+"' onchange='upd("+i+",\"sec\",this.value)'><br><small style='color:#64748b'>Stu ID: "+x.su+" | Par ID: "+x.pu+" | <i>Pass: Hidden</i></small></td>"+
   "<td><select class='e' style='width:105px;font-weight:bold;color:#1d4ed8' onchange='upd("+i+",\"sub\",this.value)'>"+opts+"</select><br><small>Items:<input type='number' class='n' style='width:42px' value='"+it+"' onchange='upd("+i+",\"items\",this.value)'></small></td>"+
   "<td><input type='number' class='n' value='"+x.preRaw+"' onchange='upd("+i+",\"preRaw\",this.value)'>/"+it+"<br><b>"+p1.toFixed(1)+"%</b></td>"+
   "<td><input type='number' class='n' value='"+x.postRaw+"' onchange='upd("+i+",\"postRaw\",this.value)'>/"+it+"<br><b>"+p2.toFixed(1)+"%</b></td>"+
@@ -256,7 +250,7 @@ for(var i=0;i<db.length;i++){
   "<td>"+(rk?"<span class='tag' style='background:#fee2e2;color:#b91c1c'>Follow-Up</span>":"<span class='tag' style='background:#dcfce7;color:#15803d'>On Track</span>")+"</td>"+
   "<td class='no-print'><button style='background:#b91c1c' onclick='del("+i+")'>X</button></td></tr>";
 }
-document.getElementById("tb").innerHTML=h||"<tr><td colspan='11' style='text-align:center'>No learners added yet. Enter an LRN above to enroll a learner.</td></tr>";
+document.getElementById("tb").innerHTML=h||"<tr><td colspan='10' style='text-align:center'>No learners added yet. Enter an LRN above to enroll a learner.</td></tr>";
 var d=cnt||1,a1=sp/d,a2=so/d,ag=a2-a1;
 document.getElementById("st").innerHTML="Learners: <b>"+cnt+"</b> | Pre MPS: <b>"+(cnt?a1.toFixed(1):"0.0")+"%</b> &rarr; Post MPS: <b>"+(cnt?a2.toFixed(1):"0.0")+"%</b> | Mean Gain: <b style='color:#15803d'>"+(cnt?(ag>=0?"+"+ag.toFixed(1):ag.toFixed(1)):"0.0")+"%</b> | Alerts: <b style='color:#b91c1c'>"+fl+"</b>";
 }
@@ -265,7 +259,10 @@ var x=db[cur.idx],it=x.items||20,p1=mps(x.preRaw,it),p2=mps(x.postRaw,it),g=p2-p
 var isParent=cur.r==="p";
 document.getElementById("pt").innerText=(isParent?"Parent Portal ("+(x.pname||"Guardian")+")":"Learner Portal ("+x.name+")")+" — Read-Only Records";
 document.getElementById("ppName").value=isParent?(x.pname||""):(x.name||"");
-
+var changed=isParent?x.ppwChanged:x.spwChanged;
+document.getElementById("pwStatus").innerHTML=changed
+  ?"<span style='color:#15803d'>&#10003; Private custom password is active (hidden from teachers).</span>"
+  :"<span style='color:#d97706'>&#9888; You are still using your initial LRN password. Enter a new private password above and click Save.</span>";
 document.getElementById("pb").innerHTML=
   "<div style='background:#eff6ff;padding:10px;border-radius:6px;margin-bottom:12px'>"+
   "<div style='font-size:16px'><b>Learner: "+x.name+"</b> (LRN: "+x.lrn+")</div>"+
