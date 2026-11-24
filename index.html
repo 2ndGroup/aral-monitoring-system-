@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Manabo NHS - ARAL Monitoring</title>
+<script>
+var initDb=[
+ {id:1,lrn:"1300050042",name:"Keith Barreras",sec:"Grade 7-Rizal",sub:"Reading & Math",pre:50,post:85,att:6,miss:0,note:"Strong score gain.",su:"1300050042",pu:"parent_keith",pw:"12345"},
+ {id:2,lrn:"LRN-002",name:"Maria Santos",sec:"Grade 7-Bonifacio",sub:"Reading",pre:48,post:84,att:6,miss:0,note:"Good progress.",su:"student1",pu:"parent1",pw:"1234"}
+];
+var db=[];
+try{
+ var s=localStorage.getItem("mnhs_aral_db");
+ db=s?JSON.parse(s):initDb;
+ if(!s)localStorage.setItem("mnhs_aral_db",JSON.stringify(db));
+}catch(e){db=initDb;}
+
+function saveDb(){try{localStorage.setItem("mnhs_aral_db",JSON.stringify(db));}catch(e){}}
+
+var cur=null;
+function go(){
+ var u=document.getElementById("u").value.trim().toLowerCase();
+ var p=document.getElementById("p").value.trim();
+ if(u==="teacher1"&&p==="1234"){cur={r:"t"};clr();show();return;}
+ for(var i=0;i<db.length;i++){
+  var sUser=String(db[i].su||db[i].lrn).trim().toLowerCase();
+  var sLrn=String(db[i].lrn).trim().toLowerCase();
+  var pUser=String(db[i].pu).trim().toLowerCase();
+  var pass=String(db[i].pw).trim();
+  if((sUser===u||sLrn===u)&&pass===p){cur={r:"s",idx:i};clr();show();return;}
+  if(pUser===u&&pass===p){cur={r:"p",idx:i};clr();show();return;}
+ }
+ alert("Invalid username/LRN or password!");
+}
+function clr(){document.getElementById("u").value="";document.getElementById("p").value="";}
+function out(){cur=null;show();}
+function upd(i,k,v){
+ db[i][k]=(k==="pre"||k==="post"||k==="att"||k==="miss")?(Number(v)||0):v.trim();
+ if(k==="lrn"){db[i].su=v.trim();db[i].pu="parent_"+v.trim().toLowerCase();}
+ saveDb();draw();
+}
+function att(i,k){db[i][k]++;saveDb();draw();}
+function del(i){if(confirm("Remove this learner?")){db.splice(i,1);saveDb();draw();}}
+function add(){
+ var n=document.getElementById("nn").value.trim();
+ var c=document.getElementById("nl").value.trim();
+ var pw=document.getElementById("npw").value.trim()||"12345";
+ if(!n||!c){alert("Please enter both LRN and Full Name.");return;}
+ var pUser="parent_"+c.toLowerCase();
+ db.push({
+  id:Date.now(),lrn:c,name:n,
+  sec:document.getElementById("ns").value.trim()||"Grade 7",
+  sub:document.getElementById("nb").value.trim()||"ARAL",
+  pre:+document.getElementById("npr").value||0,
+  post:+document.getElementById("npo").value||0,
+  att:0,miss:0,note:"Enrolled",
+  su:c,pu:pUser,pw:pw
+ });
+ saveDb();
+ ["nl","nn","ns","nb","npr","npo"].forEach(function(id){document.getElementById(id).value="";});
+ document.getElementById("npw").value="12345";
+ draw();
+ alert("Added "+n+"!\nStudent Login: "+c+" | Pass: "+pw+"\nParent Login: "+pUser+" | Pass: "+pw);
+}
+function show(){
+ document.getElementById("vL").style.display=cur?"none":"block";
+ document.getElementById("vT").style.display=cur&&cur.r==="t"?"block":"none";
+ document.getElementById("vP").style.display=cur&&cur.r!=="t"?"block":"none";
+ document.getElementById("bOut").style.display=cur?"inline-block":"none";
+ if(cur&&cur.r==="t")draw();
+ if(cur&&cur.r!=="t")drawP();
+}
+function draw(){
+ var h="",sp=0,so=0,fl=0;
+ for(var i=0;i<db.length;i++){
+  var x=db[i],g=x.post-x.pre,rk=x.miss>=2||x.post<75;
+  if(rk)fl++;sp+=Number(x.pre);so+=Number(x.post);
+  h+="<tr><td><input class='e' value='"+x.lrn+"' onchange='upd("+i+",\"lrn\",this.value)'></td>"+
+  "<td><input class='e' style='font-weight:bold' value='"+x.name+"' onchange='upd("+i+",\"name\",this.value)'><br><small>User:"+x.su+" | Parent:"+x.pu+" | Pass:"+x.pw+"</small></td>"+
+  "<td><input class='e' value='"+x.sec+"' onchange='upd("+i+",\"sec\",this.value)'><br><input class='e' value='"+x.sub+"' onchange='upd("+i+",\"sub\",this.value)'></td>"+
+  "<td><input type='number' class='n' value='"+x.pre+"' onchange='upd("+i+",\"pre\",this.value)'></td>"+
+  "<td><input type='number' class='n' value='"+x.post+"' onchange='upd("+i+",\"post\",this.value)'></td>"+
+  "<td><b>"+(g>=0?"+"+g:g)+"%</b></td>"+
+  "<td>Att:"+x.att+" <button onclick='att("+i+",\"att\")'>+1</button><br>Miss:"+x.miss+" <button onclick='att("+i+",\"miss\")'>+1</button></td>"+
+  "<td><input class='e' value='"+x.note+"' onchange='upd("+i+",\"note\",this.value)'></td>"+
+  "<td>"+(rk?"<b style='color:red'>Follow-Up</b>":"<b style='color:green'>On Track</b>")+"</td>"+
+  "<td><button style='background:#b91c1c' onclick='del("+i+")'>X</button></td></tr>";
+ }
+ document.getElementById("tb").innerHTML=h;
+ var c=db.length||1;
+ document.getElementById("st").innerHTML="Learners: <b>"+db.length+"</b> | Pre MPS: <b>"+(sp/c).toFixed(1)+"%</b> | Post MPS: <b>"+(so/c).toFixed(1)+"%</b> | Alerts: <b style='color:red'>"+fl+"</b>";
+}
+function drawP(){
+ var x=db[cur.idx],g=x.post-x.pre;
+ document.getElementById("pt").innerText=(cur.r==="p"?"Parent Portal: ":"Learner Portal: ")+x.name;
+ document.getElementById("pb").innerHTML="<p><b>LRN:</b> "+x.lrn+" | <b>Section:</b> "+x.sec+" | <b>Subject:</b> "+x.sub+"</p>"+
+ "<p><b>Pre-Test:</b> "+x.pre+"% | <b>Post-Test:</b> "+x.post+"% | <b>Gain:</b> +"+g+"%</p>"+
+ "<p><b>Attendance:</b> "+x.att+" Attended, "+x.miss+" Missed</p><p><b>Remarks:</b> "+x.note+"</p>";
+}
+</script>
+<style>
+body{font-family:sans-serif;margin:0;background:#f1f5f9}
+.top{background:#1d4ed8;color:#fff;padding:12px;display:flex;justify-content:space-between;align-items:center}
+.box{background:#fff;margin:12px;padding:14px;border-radius:8px;border:1px solid #cbd5e1}
+input{padding:8px;border:1px solid #cbd5e1;border-radius:5px;width:100%;box-sizing:border-box;margin-bottom:8px}
+.e{border:none;background:transparent;width:115px;margin:0}.n{width:55px;margin:0}
+button{padding:7px 11px;background:#1d4ed8;color:#fff;border:none;border-radius:5px;cursor:pointer}
+table{width:100%;border-collapse:collapse;font-size:12px}th,td{border:1px solid #cbd5e1;padding:6px}
+</style>
+</head>
+<body>
+<div class="top"><div><b>Manabo NHS</b><br><small>ARAL Remedial Monitoring</small></div><button id="bOut" onclick="out()" style="display:none;background:#b91c1c">Logout</button></div>
+
+<div id="vL" class="box" style="max-width:380px;margin:30px auto">
+ <h3>Portal Login</h3>
+ <input id="u" placeholder="Username or LRN">
+ <input id="p" type="password" placeholder="Password">
+ <button onclick="go()" style="width:100%">Login</button>
+</div>
+
+<div id="vT" class="box" style="display:none">
+ <h3>Teacher Dashboard (Tap Any Cell to Edit)</h3>
+ <div id="st" style="margin-bottom:10px;padding:8px;background:#eff6ff;border-radius:5px"></div>
+ <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:5px;margin-bottom:10px">
+  <input id="nl" placeholder="LRN (Required)"><input id="nn" placeholder="Full Name (Required)"><input id="ns" placeholder="Section">
+  <input id="nb" placeholder="Subject"><input id="npr" type="number" placeholder="Pre %"><input id="npo" type="number" placeholder="Post %">
+  <input id="npw" placeholder="Password" value="12345"><button onclick="add()" style="background:#15803d">+ Add</button>
+ </div>
+ <div style="overflow-x:auto"><table><thead><tr><th>LRN</th><th>Name & Login</th><th>Sec/Sub</th><th>Pre</th><th>Post</th><th>Gain</th><th>Attend</th><th>Notes</th><th>Status</th><th>Del</th></tr></thead><tbody id="tb"></tbody></table></div>
+ <button onclick="window.print()" style="margin-top:10px">Print Report</button>
+</div>
+
+<div id="vP" class="box" style="display:none"><h3 id="pt"></h3><div id="pb"></div></div>
+</body>
+</html>
